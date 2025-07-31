@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "linklibrary-mcp": {
+      "command": "npx",
+      "args": ["-y", "@msmygit/linklibrary-mcp"],
+      "env": {
+        "LL_USERNAME": "your_email@example.com",
+        "LL_PASSWORD": "your_password",
+        "ENABLE_METRICS": "true",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+} 

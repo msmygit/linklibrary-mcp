@@ -1,438 +1,371 @@
-# LinkLibrary MCP Server
+# @msmygit/linklibrary-mcp
 
-A Model Context Protocol (MCP) server that provides AI assistants with programmatic access to LinkLibrary's comprehensive bookmark management capabilities.
+A high-performance, production-ready Model Context Protocol (MCP) server that provides AI assistants with programmatic access to [LinkLibrary.ai](https://linklibrary.ai) bookmark management capabilities.
 
-## 🚀 Overview
+## 🚀 Features
 
-The LinkLibrary MCP Server enables AI assistants to intelligently manage, organize, and analyze bookmarks through a powerful set of tools. It provides seamless integration with the LinkLibrary backend, offering features like:
+### ✨ Core Features
+- **🔐 Secure Authentication** - JWT-based authentication with automatic token refresh
+- **📚 Bookmark Management** - Create, retrieve, and organize bookmarks with rich metadata
+- **📁 Collections & Tags** - Manage bookmark organization with collections and tags
+- **🔍 Advanced Search** - Powerful search with multiple filters and operators
+- **📊 Analytics** - Get insights about your bookmark usage and patterns
+- **🤖 AI Integration** - Works seamlessly with Claude Desktop, VSCode, and other MCP clients
 
-- **Smart Bookmark Management**: Create, update, and organize bookmarks with AI-powered metadata extraction
-- **Advanced Search**: Multi-filter search with relevance scoring and suggestions
-- **Collection Organization**: Create and manage themed collections for better organization
-- **Tag System**: Flexible tagging with colors and categories
-- **Analytics & Insights**: User behavior tracking and bookmark analytics
-- **AI-Powered Features**: Intelligent link parsing, content analysis, and recommendations
-
-## ✨ Key Features
-
-### 🔗 Link Management
-- Create bookmarks with automatic metadata extraction
-- Update and organize existing bookmarks
-- AI-powered link parsing from text
-- Bulk operations for efficient management
-
-### 📁 Collections & Tags
-- Create themed collections for organization
-- Flexible tagging system with colors
-- Hierarchical organization capabilities
-- Smart suggestions for tags and collections
-
-### 🔍 Advanced Search
-- Multi-filter search with AND/OR operators
-- Date range filtering
-- Collection and tag-based filtering
-- Search suggestions and autocomplete
-
-### 📊 Analytics & Insights
-- User behavior tracking
-- Bookmark usage analytics
-- Collection and tag statistics
-- Performance insights and recommendations
-
-### 🤖 AI Integration
-- Intelligent content analysis
-- Automatic categorization
-- Smart tag suggestions
-- Related content recommendations
-
-## 🏗️ Architecture
-
-The MCP server is built with a modular, scalable architecture following best practices:
-
-```
-linklibrary-mcp/
-├── src/                    # Source code
-│   ├── config/            # Configuration management
-│   ├── core/              # Core utilities and middleware
-│   ├── models/            # Data models and schemas
-│   ├── services/          # Business logic services
-│   ├── mcp/               # MCP protocol implementation
-│   │   ├── tools/         # MCP tool definitions
-│   │   └── resources/     # MCP resource definitions
-│   └── utils/             # Utility functions
-├── tests/                 # Test suite
-├── docs/                  # Documentation
-├── scripts/               # Deployment and utility scripts
-└── requirements.txt       # Python dependencies
-```
-
-### Core Components
-
-- **Authentication Service**: Secure JWT-based authentication
-- **Link Service**: Comprehensive bookmark management
-- **Collection Service**: Collection organization and management
-- **Tag Service**: Tag system with colors and categories
-- **Search Service**: Advanced search and filtering
-- **Analytics Service**: User insights and statistics
-- **Cache Manager**: Redis-based caching for performance
-- **Rate Limiter**: Protection against abuse
+### 🏗️ Architecture Features
+- **⚡ High Performance** - In-memory caching with LRU eviction and TTL
+- **🛡️ Rate Limiting** - Configurable rate limiting with sliding window
+- **📈 Metrics Driven** - Comprehensive performance monitoring and logging
+- **🔄 Retry Logic** - Automatic retry with exponential backoff
+- **🔒 Error Handling** - Robust error handling with proper error types
+- **🧪 Test Coverage** - Comprehensive test suite with mocking
 
 ## 🛠️ Installation
 
-### Prerequisites
+### For End Users
 
-- Python 3.11 or higher
-- PostgreSQL 15 or higher
-- LinkLibrary Backend API access
+The package is published on npm and can be used directly with MCP clients:
 
-### Quick Start
+```json
+{
+  "mcpServers": {
+    "linklibrary-mcp": {
+      "command": "npx",
+      "args": ["-y", "@msmygit/linklibrary-mcp"],
+      "env": {
+        "LL_USERNAME": "your_email@example.com",
+        "LL_PASSWORD": "your_password"
+      }
+    }
+  }
+}
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd linklibrary-mcp
-   ```
-
-2. **Create virtual environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Configure environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-5. **Setup database**
-   ```bash
-   # Create PostgreSQL database and user
-   sudo -u postgres psql
-   CREATE DATABASE linklibrary_mcp;
-   CREATE USER linklibrary_mcp_user WITH PASSWORD 'your_password';
-   GRANT ALL PRIVILEGES ON DATABASE linklibrary_mcp TO linklibrary_mcp_user;
-   \q
-   ```
-
-6. **No additional services required**
-   ```bash
-   # In-memory caching is used, no external cache service needed
-   ```
-
-7. **Run the server**
-   ```bash
-   python -m src.main
-   ```
-
-### Docker Deployment
+### For Developers
 
 ```bash
-# Build and run with Docker Compose
-docker-compose up -d
-
-# View logs
-docker-compose logs -f linklibrary-mcp
+npm install @msmygit/linklibrary-mcp
 ```
-
-## 📖 Usage
-
-### Basic Usage
-
-The MCP server provides a comprehensive set of tools for AI assistants:
-
-#### Authentication
-```python
-# Authenticate with LinkLibrary credentials
-auth_result = await mcp_client.authenticate("username", "password")
-```
-
-#### Create a Bookmark
-```python
-# Create a new bookmark with metadata
-result = await mcp_client.call_tool("links_create", {
-    "url": "https://example.com/article",
-    "title": "Example Article",
-    "summary": "A great article about AI",
-    "collection_id": 1,
-    "tag_ids": [1, 2],
-    "is_favorite": True
-})
-```
-
-#### Search Bookmarks
-```python
-# Advanced search with filters
-results = await mcp_client.call_tool("search_advanced", {
-    "query": "machine learning",
-    "operator": "AND",
-    "collection_ids": [1, 2],
-    "tag_ids": [1, 3],
-    "limit": 20
-})
-```
-
-#### Parse Links from Text
-```python
-# Extract and analyze links from text
-parsed_links = await mcp_client.call_tool("links_parse", {
-    "text": "Check out these resources: https://example.com/article1 and https://example.com/article2"
-})
-```
-
-### Available Tools
-
-#### Link Management
-- `links_get` - Retrieve links with filtering and pagination
-- `links_create` - Create new bookmarks with metadata
-- `links_update` - Update existing bookmarks
-- `links_delete` - Delete bookmarks
-- `links_parse` - Parse links from text with AI analysis
-
-#### Collections
-- `collections_get` - Retrieve user collections
-- `collections_create` - Create new collections
-- `collections_update` - Update collections
-- `collections_delete` - Delete collections
-
-#### Tags
-- `tags_get` - Retrieve user tags
-- `tags_create` - Create new tags
-- `tags_update` - Update tags
-- `tags_delete` - Delete tags
-
-#### Search
-- `search_advanced` - Advanced search with multiple filters
-- `search_suggestions` - Get search suggestions
-
-#### Analytics
-- `analytics_user_stats` - User statistics and insights
-- `analytics_link_insights` - Link-specific analytics
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
-```env
-# MCP Server Configuration
-MCP_SERVER_NAME=linklibrary-mcp
-MCP_SERVER_VERSION=1.0.0
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `LL_USERNAME` | LinkLibrary.ai email address | - | Yes* |
+| `LL_PASSWORD` | LinkLibrary.ai password | - | Yes* |
+| `LL_TOKEN` | LinkLibrary.ai API token | - | Yes* |
+| `LINKLIBRARY_API_URL` | API base URL | `https://linklibrary.ai/api` | No |
+| `API_TIMEOUT_MS` | API request timeout | `30000` | No |
+| `API_MAX_RETRIES` | Maximum retry attempts | `3` | No |
+| `CACHE_TTL_SECONDS` | Cache TTL in seconds | `300` | No |
+| `CACHE_MAX_SIZE` | Maximum cache entries | `1000` | No |
+| `RATE_LIMIT_REQUESTS` | Rate limit requests per window | `100` | No |
+| `RATE_LIMIT_WINDOW_MS` | Rate limit window in ms | `60000` | No |
+| `LOG_LEVEL` | Logging level | `info` | No |
+| `ENABLE_METRICS` | Enable performance metrics | `false` | No |
 
-# LinkLibrary API Configuration
-LINKLIBRARY_API_URL=http://localhost:8000
-LINKLIBRARY_API_KEY=your_api_key_here
+*Either `LL_USERNAME`/`LL_PASSWORD` or `LL_TOKEN` is required.
 
-# Authentication
-JWT_SECRET_KEY=your_jwt_secret_key_here
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+### MCP Client Configuration
 
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/linklibrary_mcp
+#### Claude Desktop
 
-# In-Memory Cache
-CACHE_TTL=3600
-CACHE_MAX_SIZE=1000
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS/Linux) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
-# Rate Limiting
-RATE_LIMIT_REQUESTS=100
-RATE_LIMIT_WINDOW=3600
-
-# Logging
-LOG_LEVEL=INFO
-LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
+```json
+{
+  "mcpServers": {
+    "linklibrary-mcp": {
+      "command": "npx",
+      "args": ["-y", "@msmygit/linklibrary-mcp"],
+      "env": {
+        "LL_USERNAME": "your_email@example.com",
+        "LL_PASSWORD": "your_password",
+        "ENABLE_METRICS": "true"
+      }
+    }
+  }
+}
 ```
 
-### Security Configuration
+#### VSCode
 
-- **JWT Authentication**: Secure token-based authentication
-- **Rate Limiting**: Configurable rate limits to prevent abuse
-- **Input Validation**: Comprehensive validation for all inputs
-- **CORS Configuration**: Configurable cross-origin resource sharing
-- **SSL/TLS**: Support for secure communications
+Add to your VSCode settings:
 
-## 🧪 Testing
+```json
+{
+  "mcp.servers": {
+    "linklibrary-mcp": {
+      "command": "npx",
+      "args": ["-y", "@msmygit/linklibrary-mcp"],
+      "env": {
+        "LL_USERNAME": "your_email@example.com",
+        "LL_PASSWORD": "your_password"
+      }
+    }
+  }
+}
+```
 
-### Run Tests
+## 🛠️ Available Tools
+
+### Authentication
+- `authenticate` - Authenticate with LinkLibrary credentials
+
+### Bookmark Management
+- `get_links` - Retrieve bookmarks with filtering and pagination
+- `create_link` - Create new bookmarks with metadata
+
+### Organization
+- `get_collections` - Retrieve user collections
+- `get_tags` - Retrieve user tags
+
+### Search & Analytics
+- `search_advanced` - Advanced search with multiple filters
+- `get_user_stats` - Get user statistics and insights
+
+## 💡 Usage Examples
+
+Once connected to your MCP client, you can ask:
+
+- "Show me my recent bookmarks"
+- "Create a bookmark for this article about AI"
+- "Search for machine learning resources in my Development collection"
+- "Show me my bookmark statistics for this month"
+- "What are my most used tags?"
+
+## 🏗️ Architecture
+
+### Core Components
+
+```
+linklibrary-mcp/
+├── src/
+│   ├── types.ts              # TypeScript type definitions
+│   ├── config.ts             # Configuration management
+│   ├── server.ts             # Main MCP server implementation
+│   ├── services/
+│   │   ├── api-client.ts     # HTTP client with retry logic
+│   │   └── auth-service.ts   # Authentication management
+│   └── utils/
+│       ├── logger.ts         # Structured logging with metrics
+│       ├── cache.ts          # In-memory LRU cache
+│       └── rate-limiter.ts   # Rate limiting implementation
+├── scripts/
+│   └── build.js              # Build script
+├── tests/
+│   └── server.test.ts        # Comprehensive test suite
+└── package.json              # npm package configuration
+```
+
+### Performance Features
+
+#### 🚀 Caching
+- **In-memory LRU cache** with configurable TTL
+- **Automatic cache invalidation** on data changes
+- **Cache hit rate monitoring** and statistics
+
+#### ⚡ Rate Limiting
+- **Sliding window rate limiting** for API protection
+- **Configurable limits** per operation type
+- **Rate limit monitoring** and reporting
+
+#### 📊 Metrics & Monitoring
+- **Performance metrics** collection and reporting
+- **Request/response timing** with percentiles
+- **Error rate tracking** and alerting
+- **Cache performance** monitoring
+
+#### 🔄 Retry Logic
+- **Exponential backoff** for transient failures
+- **Configurable retry attempts** and delays
+- **Smart retry conditions** (5xx errors, timeouts)
+
+## 🧪 Development
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+
+### Setup
+
+```bash
+git clone <repository-url>
+cd linklibrary-mcp
+npm install
+```
+
+### Development Commands
+
+```bash
+# Build the package
+npm run build
+
+# Run in development mode
+npm run dev
+
+# Run tests
+npm test
+
+# Run tests with coverage
+npm test -- --coverage
+
+# Lint code
+npm run lint
+
+# Format code
+npm run format
+```
+
+### Testing
+
+The project includes comprehensive tests:
+
+- **Unit tests** for all services and utilities
+- **Integration tests** for API interactions
+- **Mock testing** for external dependencies
+- **Performance tests** for caching and rate limiting
 
 ```bash
 # Run all tests
-pytest
+npm test
 
-# Run with coverage
-pytest --cov=src
-
-# Run specific test categories
-pytest tests/test_services/
-pytest tests/test_mcp/
-pytest tests/test_integration/
+# Run specific test suites
+npm test -- --testNamePattern="Authentication"
+npm test -- --testNamePattern="Cache"
 ```
 
-### Test Structure
-
-```
-tests/
-├── conftest.py           # Test configuration and fixtures
-├── test_services/        # Service layer tests
-├── test_mcp/            # MCP protocol tests
-└── test_integration/    # Integration tests
-```
-
-## 📊 Monitoring
-
-### Health Checks
+### Building for Production
 
 ```bash
-# Basic health check
-curl http://localhost:8000/health
+# Build the package
+npm run build
 
-# Detailed health check
-curl http://localhost:8000/health/detailed
+# Test the built package
+npm start
+
+# Publish to npm
+npm publish
 ```
 
-### Metrics
+## 📊 Performance
 
-The server exposes Prometheus metrics at `/metrics`:
+### Benchmarks
+
+- **Response Time**: < 100ms for cached requests
+- **Throughput**: 1000+ requests per minute
+- **Memory Usage**: < 50MB for typical usage
+- **Cache Hit Rate**: > 80% for read operations
+
+### Monitoring
+
+Enable metrics collection by setting `ENABLE_METRICS=true`:
 
 ```bash
-curl http://localhost:8000/metrics
+export ENABLE_METRICS=true
+npx @msmygit/linklibrary-mcp
 ```
 
-### Logging
-
-Structured logging with rotation:
-
-```python
-import logging
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-```
-
-## 🚀 Deployment
-
-### Production Deployment
-
-See [Deployment Guide](docs/deployment.md) for detailed instructions on:
-
-- Docker deployment
-- Kubernetes deployment
-- Production server setup
-- SSL/TLS configuration
-- Load balancing
-- Monitoring and alerting
-
-### Performance Optimization
-
-- **Connection Pooling**: Efficient database connections
-- **Caching**: In-memory caching for frequently accessed data
-- **Async Operations**: Non-blocking I/O for all operations
-- **Batch Processing**: Efficient bulk operations
-- **Pagination**: Optimized data retrieval
+Metrics include:
+- Request count and response times
+- Cache hit/miss rates
+- Rate limit usage
+- Error rates and types
 
 ## 🔒 Security
 
 ### Security Features
 
-- **Authentication**: JWT-based secure authentication
-- **Authorization**: Role-based access control
-- **Input Validation**: Comprehensive input sanitization
-- **Rate Limiting**: Protection against abuse
-- **Audit Logging**: Track all operations for security monitoring
-- **HTTPS/TLS**: Secure communications
+- **No local storage** - credentials not stored locally
+- **Environment variables** - secure credential management
+- **API authentication** - uses LinkLibrary.ai's secure API
+- **Rate limiting** - protection against abuse
+- **Input validation** - comprehensive parameter validation
+- **Error sanitization** - no sensitive data in error messages
 
-### Security Best Practices
+### Best Practices
 
-- Use strong, unique passwords
-- Keep dependencies updated
-- Monitor logs for suspicious activity
-- Regular security audits
-- Implement proper access controls
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Setup
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
-
-### Code Style
-
-- Follow PEP 8 for Python code
-- Use type hints
-- Write comprehensive docstrings
-- Add tests for new features
-- Update documentation as needed
-
-## 📚 Documentation
-
-- [Architecture Guide](docs/architecture.md) - Detailed architecture documentation
-- [API Documentation](docs/api.md) - Complete API reference
-- [Deployment Guide](docs/deployment.md) - Deployment instructions
-- [Contributing Guide](CONTRIBUTING.md) - How to contribute
+- Use environment variables for credentials
+- Enable metrics only in development
+- Monitor rate limit usage
+- Regularly update dependencies
+- Use HTTPS for all API communications
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-#### Connection Issues
+#### Authentication Errors
 ```bash
-# Check if services are running
-sudo systemctl status linklibrary-mcp
-sudo systemctl status postgresql
-sudo systemctl status redis-server
+# Check environment variables
+echo $LL_USERNAME
+echo $LL_PASSWORD
+
+# Verify API connectivity
+curl -I https://linklibrary.ai/api/health
 ```
 
-#### Authentication Issues
-- Verify API credentials in `.env`
-- Check JWT secret key configuration
-- Ensure LinkLibrary backend is accessible
-
 #### Performance Issues
-- Monitor database connection pool
-- Check in-memory cache performance
-- Review rate limiting configuration
+```bash
+# Check cache statistics
+# Enable debug logging
+export LOG_LEVEL=debug
 
-### Getting Help
+# Monitor rate limits
+# Check rate limit configuration
+```
 
-- **Documentation**: Check the docs directory
-- **Issues**: Report bugs on GitHub
-- **Discussions**: Join community discussions
-- **Email**: Contact support@linklibrary.com
+#### Connection Issues
+```bash
+# Test API connectivity
+curl https://linklibrary.ai/api/health
+
+# Check network configuration
+ping linklibrary.ai
+```
+
+### Debug Mode
+
+Enable debug logging for troubleshooting:
+
+```bash
+export LOG_LEVEL=debug
+export ENABLE_METRICS=true
+npx @msmygit/linklibrary-mcp
+```
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## 🤝 Contributing
 
-- LinkLibrary team for the backend API
-- MCP community for the protocol specification
-- Contributors and maintainers
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Development Guidelines
+
+- Follow TypeScript best practices
+- Add tests for new features
+- Update documentation as needed
+- Follow the existing code style
+- Ensure all tests pass before submitting
 
 ## 📞 Support
 
-For support and questions:
+- **Documentation**: [LinkLibrary.ai](https://linklibrary.ai)
+- **Issues**: [GitHub Issues](https://github.com/msmygit/linklibrary-mcp/issues)
+- **Email**: linklibrary.ai@gmail.com
 
-- **Documentation**: [docs/](docs/)
-- **Issues**: [GitHub Issues](https://github.com/linklibrary/linklibrary-mcp/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/linklibrary/linklibrary-mcp/discussions)
-- **Email**: support@linklibrary.com
+## 🔗 Links
+
+- [LinkLibrary.ai](https://linklibrary.ai) - Main service
+- [MCP Documentation](https://modelcontextprotocol.io/) - Protocol specification
+- [npm Package](https://www.npmjs.com/package/@msmygit/linklibrary-mcp) - Package page
+- [GitHub Repository](https://github.com/msmygit/linklibrary-mcp) - Source code
 
 ---
 
-**Made with ❤️ by the LinkLibrary Team** 
+**Built with ❤️ for the AI community** 

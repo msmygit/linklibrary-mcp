@@ -85,19 +85,7 @@ linklibrary-mcp/
 │   │   └── analytics_service.py # Analytics and insights service
 │   ├── mcp/
 │   │   ├── __init__.py
-│   │   ├── server.py           # MCP server implementation
-│   │   ├── tools/
-│   │   │   ├── __init__.py
-│   │   │   ├── links.py        # Link-related MCP tools
-│   │   │   ├── collections.py  # Collection-related MCP tools
-│   │   │   ├── tags.py         # Tag-related MCP tools
-│   │   │   ├── search.py       # Search-related MCP tools
-│   │   │   └── analytics.py    # Analytics-related MCP tools
-│   │   └── resources/
-│   │       ├── __init__.py
-│   │       ├── links.py        # Link resource definitions
-│   │       ├── collections.py  # Collection resource definitions
-│   │       └── tags.py         # Tag resource definitions
+│   │   └── server.py           # MCP server implementation with FastMCP
 │   └── utils/
 │       ├── __init__.py
 │       ├── http_client.py      # HTTP client utilities
@@ -475,23 +463,11 @@ link_service = LinkService()
 #### 3.5 MCP Server Implementation (`mcp/server.py`)
 
 ```python
-import asyncio
-import json
-import logging
 from typing import Any, Dict, List, Optional
-from mcp.server import Server
+import httpx
+import logging
+from mcp.server.fastmcp import FastMCP
 from mcp.server.models import InitializationOptions
-from mcp.server.stdio import stdio_server
-from mcp.types import (
-    CallToolRequest,
-    CallToolResult,
-    ListToolsRequest,
-    ListToolsResult,
-    Tool,
-    TextContent,
-    ImageContent,
-    EmbeddedResource
-)
 
 from ..config.settings import settings
 from ..services.auth_service import auth_service
@@ -499,233 +475,585 @@ from ..services.link_service import link_service
 from ..services.collection_service import collection_service
 from ..services.tag_service import tag_service
 from ..services.search_service import search_service
-from .tools.links import LinkTools
-from .tools.collections import CollectionTools
-from .tools.tags import TagTools
-from .tools.search import SearchTools
+
+# Initialize FastMCP server with protocol version
+mcp = FastMCP("linklibrary")
+
+# Global state for authentication
+current_user: Optional[Dict[str, Any]] = None
+current_token: Optional[str] = None
 
 logger = logging.getLogger(__name__)
 
-class LinkLibraryMCPServer:
-    def __init__(self):
-        self.server = Server(settings.mcp_server_name)
-        self.current_user: Optional[Dict[str, Any]] = None
-        self.current_token: Optional[str] = None
-        
-        # Initialize tool handlers
-        self.link_tools = LinkTools()
-        self.collection_tools = CollectionTools()
-        self.tag_tools = TagTools()
-        self.search_tools = SearchTools()
-        
-        # Register MCP handlers
-        self._register_handlers()
-    
-    def _register_handlers(self):
-        """Register all MCP protocol handlers."""
-        
-        @self.server.list_tools()
-        async def handle_list_tools() -> ListToolsResult:
-            """List all available tools."""
-            tools = []
-            
-            # Add link tools
-            tools.extend(self.link_tools.get_tools())
-            
-            # Add collection tools
-            tools.extend(self.collection_tools.get_tools())
-            
-            # Add tag tools
-            tools.extend(self.tag_tools.get_tools())
-            
-            # Add search tools
-            tools.extend(self.search_tools.get_tools())
-            
-            return ListToolsResult(tools=tools)
-        
-        @self.server.call_tool()
-        async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
-            """Handle tool calls with authentication."""
-            try:
-                # Check authentication
-                if not self.current_token:
-                    raise Exception("Authentication required. Please authenticate first.")
-                
-                # Route to appropriate tool handler
-                if name.startswith("links_"):
-                    result = await self.link_tools.handle_tool(name, arguments, self.current_token)
-                elif name.startswith("collections_"):
-                    result = await self.collection_tools.handle_tool(name, arguments, self.current_token)
-                elif name.startswith("tags_"):
-                    result = await self.tag_tools.handle_tool(name, arguments, self.current_token)
-                elif name.startswith("search_"):
-                    result = await self.search_tools.handle_tool(name, arguments, self.current_token)
-                else:
-                    raise Exception(f"Unknown tool: {name}")
-                
-                return CallToolResult(
-                    content=[TextContent(type="text", text=json.dumps(result, indent=2))]
-                )
-                
-            except Exception as e:
-                logger.error(f"Tool call failed: {e}")
-                return CallToolResult(
-                    content=[TextContent(type="text", text=f"Error: {str(e)}")]
-                )
-        
-        @self.server.list_resources()
-        async def handle_list_resources() -> List[EmbeddedResource]:
-            """List available resources."""
-            # This can be used to provide static resources like documentation
-            return []
-    
-    async def authenticate(self, username: str, password: str) -> Dict[str, Any]:
-        """Authenticate user and store credentials."""
-        try:
-            auth_result = await auth_service.authenticate_user(username, password)
-            self.current_token = auth_result["access_token"]
-            self.current_user = await auth_service.get_current_user(self.current_token)
-            
-            return {
-                "success": True,
-                "user": self.current_user,
-                "message": "Authentication successful"
-            }
-        except Exception as e:
-            logger.error(f"Authentication failed: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    async def run(self):
-        """Run the MCP server."""
-        # Start cache cleanup task
-        from ..core.cache import cleanup_cache_task
-        asyncio.create_task(cleanup_cache_task())
-        
-        async with stdio_server() as (read_stream, write_stream):
-            await self.server.run(
-                read_stream,
-                write_stream,
-                InitializationOptions(
-                    server_name=settings.mcp_server_name,
-                    server_version=settings.mcp_server_version,
-                    capabilities=self.server.get_capabilities(
-                        notification_options=None,
-                        experimental_capabilities={}
-                    )
-                )
-            )
+# Authentication helper
+async def ensure_authenticated() -> str:
+    """Ensure user is authenticated and return token."""
+    if not current_token:
+        raise Exception("Authentication required. Please authenticate first.")
+    return current_token
 
-# Global server instance
-mcp_server = LinkLibraryMCPServer()
+# Link Management Tools
+@mcp.tool()
+async def authenticate(username: str, password: str) -> str:
+    """Authenticate with LinkLibrary credentials.
+    
+    Args:
+        username: Your LinkLibrary email or username
+        password: Your LinkLibrary password
+    """
+    global current_user, current_token
+    
+    try:
+        auth_result = await auth_service.authenticate_user(username, password)
+        current_token = auth_result["access_token"]
+        current_user = await auth_service.get_current_user(current_token)
+        
+        return f"Authentication successful. Welcome, {current_user.get('full_name', 'User')}!"
+    except Exception as e:
+        logger.error(f"Authentication failed: {e}")
+        return f"Authentication failed: {str(e)}"
+
+@mcp.tool()
+async def get_links(
+    limit: int = 50,
+    skip: int = 0,
+    collection_id: Optional[int] = None,
+    tag_ids: Optional[List[int]] = None,
+    search: Optional[str] = None,
+    is_favorite: Optional[bool] = None,
+    sort_by: str = "created_at",
+    sort_desc: bool = True
+) -> str:
+    """Get links with optional filtering and pagination.
+    
+    Args:
+        limit: Number of links to return (default: 50, max: 100)
+        skip: Number of links to skip for pagination (default: 0)
+        collection_id: Filter by collection ID
+        tag_ids: Filter by tag IDs
+        search: Search query for title, summary, or notes
+        is_favorite: Filter by favorite status
+        sort_by: Sort field (default: "created_at")
+        sort_desc: Sort in descending order (default: true)
+    """
+    token = await ensure_authenticated()
+    
+    try:
+        result = await link_service.get_links(
+            token=token,
+            limit=limit,
+            skip=skip,
+            collection_id=collection_id,
+            tag_ids=tag_ids,
+            search=search,
+            is_favorite=is_favorite,
+            sort_by=sort_by,
+            sort_desc=sort_desc
+        )
+        
+        links = result.get("items", [])
+        total = result.get("total", 0)
+        
+        if not links:
+            return "No links found matching your criteria."
+        
+        # Format the response
+        response = f"Found {total} links:\n\n"
+        for link in links:
+            response += f"📌 {link['title']}\n"
+            response += f"🔗 {link['url']}\n"
+            if link.get('summary'):
+                response += f"📝 {link['summary'][:100]}...\n"
+            response += f"⭐ {'Favorite' if link.get('is_favorite') else 'Not favorite'}\n"
+            response += f"📅 {link['created_at'][:10]}\n"
+            response += "---\n"
+        
+        return response
+    except Exception as e:
+        logger.error(f"Failed to get links: {e}")
+        return f"Error retrieving links: {str(e)}"
+
+@mcp.tool()
+async def create_link(
+    url: str,
+    title: str,
+    summary: Optional[str] = None,
+    notes: Optional[str] = None,
+    collection_id: Optional[int] = None,
+    tag_ids: Optional[List[int]] = None,
+    is_favorite: bool = False
+) -> str:
+    """Create a new bookmark with optional metadata.
+    
+    Args:
+        url: The URL to bookmark
+        title: Title for the bookmark
+        summary: Summary/description
+        notes: Additional notes
+        collection_id: Collection to add to
+        tag_ids: Tags to apply
+        is_favorite: Mark as favorite (default: false)
+    """
+    token = await ensure_authenticated()
+    
+    try:
+        result = await link_service.create_link(
+            token=token,
+            url=url,
+            title=title,
+            summary=summary,
+            notes=notes,
+            collection_id=collection_id,
+            tag_ids=tag_ids,
+            is_favorite=is_favorite
+        )
+        
+        return f"✅ Bookmark created successfully!\n\n📌 {result['title']}\n🔗 {result['url']}\n📝 {result.get('summary', 'No summary')}"
+    except Exception as e:
+        logger.error(f"Failed to create link: {e}")
+        return f"Error creating bookmark: {str(e)}"
+
+@mcp.tool()
+async def update_link(
+    link_id: str,
+    title: Optional[str] = None,
+    summary: Optional[str] = None,
+    notes: Optional[str] = None,
+    collection_id: Optional[int] = None,
+    tag_ids: Optional[List[int]] = None,
+    is_favorite: Optional[bool] = None
+) -> str:
+    """Update an existing link's properties.
+    
+    Args:
+        link_id: ID of the link to update
+        title: New title
+        summary: New summary
+        notes: New notes
+        collection_id: New collection ID
+        tag_ids: New tag IDs
+        is_favorite: New favorite status
+    """
+    token = await ensure_authenticated()
+    
+    try:
+        updates = {}
+        if title is not None:
+            updates['title'] = title
+        if summary is not None:
+            updates['summary'] = summary
+        if notes is not None:
+            updates['notes'] = notes
+        if collection_id is not None:
+            updates['collection_id'] = collection_id
+        if tag_ids is not None:
+            updates['tag_ids'] = tag_ids
+        if is_favorite is not None:
+            updates['is_favorite'] = is_favorite
+        
+        result = await link_service.update_link(token, link_id, **updates)
+        
+        return f"✅ Bookmark updated successfully!\n\n📌 {result['title']}\n🔗 {result['url']}"
+    except Exception as e:
+        logger.error(f"Failed to update link: {e}")
+        return f"Error updating bookmark: {str(e)}"
+
+@mcp.tool()
+async def delete_link(link_id: str) -> str:
+    """Delete a link permanently.
+    
+    Args:
+        link_id: ID of the link to delete
+    """
+    token = await ensure_authenticated()
+    
+    try:
+        await link_service.delete_link(token, link_id)
+        return "✅ Bookmark deleted successfully!"
+    except Exception as e:
+        logger.error(f"Failed to delete link: {e}")
+        return f"Error deleting bookmark: {str(e)}"
+
+@mcp.tool()
+async def parse_links(text: str) -> str:
+    """Parse text and extract links with AI-powered analysis.
+    
+    Args:
+        text: Text containing URLs to parse
+    """
+    token = await ensure_authenticated()
+    
+    try:
+        parsed_links = await link_service.parse_links_from_text(token, text)
+        
+        if not parsed_links:
+            return "No links found in the provided text."
+        
+        response = f"Found {len(parsed_links)} links:\n\n"
+        for i, link_data in enumerate(parsed_links, 1):
+            response += f"{i}. 🔗 {link_data['link']}\n"
+            response += f"   📌 {link_data['desc']}\n"
+            response += f"   📝 {link_data['summary'][:100]}...\n"
+            response += f"   💡 {link_data['notes'][:100]}...\n"
+            response += "---\n"
+        
+        return response
+    except Exception as e:
+        logger.error(f"Failed to parse links: {e}")
+        return f"Error parsing links: {str(e)}"
+
+# Collection Management Tools
+@mcp.tool()
+async def get_collections(include_default: bool = True) -> str:
+    """Retrieve user's collections.
+    
+    Args:
+        include_default: Include default collections (default: true)
+    """
+    token = await ensure_authenticated()
+    
+    try:
+        collections = await collection_service.get_collections(token, include_default=include_default)
+        
+        if not collections:
+            return "No collections found."
+        
+        response = f"Found {len(collections)} collections:\n\n"
+        for collection in collections:
+            response += f"📁 {collection['name']}\n"
+            if collection.get('description'):
+                response += f"   📝 {collection['description']}\n"
+            response += f"   🔗 {collection.get('link_count', 0)} links\n"
+            response += f"   🎨 Color: {collection.get('color', 'default')}\n"
+            response += "---\n"
+        
+        return response
+    except Exception as e:
+        logger.error(f"Failed to get collections: {e}")
+        return f"Error retrieving collections: {str(e)}"
+
+@mcp.tool()
+async def create_collection(
+    name: str,
+    description: Optional[str] = None,
+    icon: Optional[str] = None,
+    color: Optional[str] = None
+) -> str:
+    """Create a new collection.
+    
+    Args:
+        name: Collection name
+        description: Collection description
+        icon: Icon identifier
+        color: Color theme
+    """
+    token = await ensure_authenticated()
+    
+    try:
+        result = await collection_service.create_collection(
+            token=token,
+            name=name,
+            description=description,
+            icon=icon,
+            color=color
+        )
+        
+        return f"✅ Collection created successfully!\n\n📁 {result['name']}\n📝 {result.get('description', 'No description')}"
+    except Exception as e:
+        logger.error(f"Failed to create collection: {e}")
+        return f"Error creating collection: {str(e)}"
+
+# Tag Management Tools
+@mcp.tool()
+async def get_tags(include_counts: bool = True) -> str:
+    """Retrieve user's tags.
+    
+    Args:
+        include_counts: Include link counts (default: true)
+    """
+    token = await ensure_authenticated()
+    
+    try:
+        tags = await tag_service.get_tags(token, include_counts=include_counts)
+        
+        if not tags:
+            return "No tags found."
+        
+        response = f"Found {len(tags)} tags:\n\n"
+        for tag in tags:
+            response += f"🏷️ {tag['name']}\n"
+            response += f"   🎨 Color: {tag.get('color', 'default')}\n"
+            if include_counts:
+                response += f"   🔗 {tag.get('link_count', 0)} links\n"
+            response += "---\n"
+        
+        return response
+    except Exception as e:
+        logger.error(f"Failed to get tags: {e}")
+        return f"Error retrieving tags: {str(e)}"
+
+@mcp.tool()
+async def create_tag(name: str, color: Optional[str] = None) -> str:
+    """Create a new tag.
+    
+    Args:
+        name: Tag name
+        color: Tag color
+    """
+    token = await ensure_authenticated()
+    
+    try:
+        result = await tag_service.create_tag(token, name=name, color=color)
+        
+        return f"✅ Tag created successfully!\n\n🏷️ {result['name']}\n🎨 Color: {result.get('color', 'default')}"
+    except Exception as e:
+        logger.error(f"Failed to create tag: {e}")
+        return f"Error creating tag: {str(e)}"
+
+# Search Tools
+@mcp.tool()
+async def search_advanced(
+    query: str,
+    operator: str = "OR",
+    collection_ids: Optional[List[int]] = None,
+    tag_ids: Optional[List[int]] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 50,
+    skip: int = 0,
+    sort_by: str = "relevance",
+    sort_desc: bool = True
+) -> str:
+    """Perform advanced search with multiple filters.
+    
+    Args:
+        query: Search query
+        operator: Search operator - "AND" or "OR" (default: "OR")
+        collection_ids: Filter by collections
+        tag_ids: Filter by tags
+        start_date: Start date filter (ISO format)
+        end_date: End date filter (ISO format)
+        limit: Number of results (default: 50)
+        skip: Skip for pagination (default: 0)
+        sort_by: Sort field (default: "relevance")
+        sort_desc: Sort in descending order (default: true)
+    """
+    token = await ensure_authenticated()
+    
+    try:
+        result = await search_service.advanced_search(
+            token=token,
+            query=query,
+            operator=operator,
+            collection_ids=collection_ids,
+            tag_ids=tag_ids,
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+            skip=skip,
+            sort_by=sort_by,
+            sort_desc=sort_desc
+        )
+        
+        links = result.get("items", [])
+        total = result.get("total", 0)
+        
+        if not links:
+            return f"No results found for query: '{query}'"
+        
+        response = f"Found {total} results for '{query}':\n\n"
+        for link in links:
+            response += f"📌 {link['title']}\n"
+            response += f"🔗 {link['url']}\n"
+            if link.get('summary'):
+                response += f"📝 {link['summary'][:100]}...\n"
+            response += f"📅 {link['created_at'][:10]}\n"
+            response += "---\n"
+        
+        return response
+    except Exception as e:
+        logger.error(f"Failed to search: {e}")
+        return f"Error performing search: {str(e)}"
+
+@mcp.tool()
+async def search_suggestions(query: str, limit: int = 10) -> str:
+    """Get search suggestions based on user's bookmarks.
+    
+    Args:
+        query: Partial search query
+        limit: Number of suggestions (default: 10)
+    """
+    token = await ensure_authenticated()
+    
+    try:
+        suggestions = await search_service.get_suggestions(token, query=query, limit=limit)
+        
+        if not suggestions:
+            return f"No suggestions found for '{query}'"
+        
+        response = f"Search suggestions for '{query}':\n\n"
+        for i, suggestion in enumerate(suggestions, 1):
+            response += f"{i}. {suggestion}\n"
+        
+        return response
+    except Exception as e:
+        logger.error(f"Failed to get suggestions: {e}")
+        return f"Error getting suggestions: {str(e)}"
+
+# Analytics Tools
+@mcp.tool()
+async def get_user_stats(period: str = "month") -> str:
+    """Get user statistics and insights.
+    
+    Args:
+        period: Time period - "day", "week", "month", "year" (default: "month")
+    """
+    token = await ensure_authenticated()
+    
+    try:
+        stats = await search_service.get_user_stats(token, period=period)
+        
+        response = f"📊 Your LinkLibrary Statistics ({period}):\n\n"
+        response += f"📚 Total Links: {stats.get('total_links', 0)}\n"
+        response += f"📁 Total Collections: {stats.get('total_collections', 0)}\n"
+        response += f"🏷️ Total Tags: {stats.get('total_tags', 0)}\n"
+        response += f"⭐ Favorite Links: {stats.get('favorite_links', 0)}\n"
+        response += f"📦 Archived Links: {stats.get('archived_links', 0)}\n"
+        response += f"📈 Links Added This {period.capitalize()}: {stats.get('links_added_this_period', 0)}\n\n"
+        
+        # Most used collections
+        most_used_collections = stats.get('most_used_collections', [])
+        if most_used_collections:
+            response += "🏆 Most Used Collections:\n"
+            for collection in most_used_collections[:3]:
+                response += f"   📁 {collection['name']}: {collection['link_count']} links\n"
+        
+        # Most used tags
+        most_used_tags = stats.get('most_used_tags', [])
+        if most_used_tags:
+            response += "\n🏆 Most Used Tags:\n"
+            for tag in most_used_tags[:3]:
+                response += f"   🏷️ {tag['name']}: {tag['link_count']} links\n"
+        
+        return response
+    except Exception as e:
+        logger.error(f"Failed to get user stats: {e}")
+        return f"Error retrieving statistics: {str(e)}"
+
+# Run the server with protocol version compliance
+if __name__ == "__main__":
+    # Initialize and run the server with proper protocol version
+    mcp.run(
+        transport='stdio',
+        initialization_options=InitializationOptions(
+            server_name="linklibrary",
+            server_version="1.0.0",
+            capabilities=mcp.get_capabilities(
+                notification_options=None,
+                experimental_capabilities={}
+            )
+        )
+    )
 ```
 
-### 4. MCP Tools Implementation
+### 4. MCP Protocol Version Compliance
 
-#### 4.1 Link Tools (`mcp/tools/links.py`)
+The MCP server is designed to be compliant with the latest MCP protocol specification. Key compliance features include:
+
+#### 4.1 Protocol Version Support
+- **MCP SDK Version**: 1.3.0 or higher
+- **Protocol Version**: Supports the latest MCP protocol specification
+- **Transport**: STDIO-based communication for maximum compatibility
+- **Capabilities**: Full support for tools, resources, and prompts
+
+#### 4.2 Initialization Options
+```python
+InitializationOptions(
+    server_name="linklibrary",
+    server_version="1.0.0",
+    capabilities=mcp.get_capabilities(
+        notification_options=None,
+        experimental_capabilities={}
+    )
+)
+```
+
+#### 4.3 Error Handling
+- **Protocol-compliant error responses** for all tool calls
+- **Proper logging** to stderr (not stdout) for STDIO transport
+- **Graceful degradation** when services are unavailable
+
+### 5. MCP Server Features
+
+The MCP server provides the following capabilities:
+
+#### 5.1 Available Tools
+
+The server exposes the following tools using the `@mcp.tool()` decorator:
+
+**Authentication:**
+- `authenticate` - Authenticate with LinkLibrary credentials
+
+**Link Management:**
+- `get_links` - Retrieve links with filtering and pagination
+- `create_link` - Create new bookmarks with metadata
+- `update_link` - Update existing bookmarks
+- `delete_link` - Delete bookmarks
+- `parse_links` - Parse text and extract links with AI analysis
+
+**Collection Management:**
+- `get_collections` - Retrieve user's collections
+- `create_collection` - Create new collections
+
+**Tag Management:**
+- `get_tags` - Retrieve user's tags
+- `create_tag` - Create new tags
+
+**Search:**
+- `search_advanced` - Advanced search with multiple filters
+- `search_suggestions` - Get search suggestions
+
+**Analytics:**
+- `get_user_stats` - Get user statistics and insights
+
+#### 5.2 Tool Implementation Pattern
+
+All tools follow the same pattern:
 
 ```python
-from typing import Dict, Any, List, Optional
-from mcp.types import Tool
-
-from ...services.link_service import link_service
-
-class LinkTools:
-    def get_tools(self) -> List[Tool]:
-        """Get all link-related tools."""
-        return [
-            Tool(
-                name="links_get",
-                description="Get links with optional filtering and pagination",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "limit": {"type": "integer", "default": 50},
-                        "skip": {"type": "integer", "default": 0},
-                        "collection_id": {"type": "integer"},
-                        "tag_ids": {"type": "array", "items": {"type": "integer"}},
-                        "search": {"type": "string"},
-                        "is_favorite": {"type": "boolean"},
-                        "sort_by": {"type": "string", "default": "created_at"},
-                        "sort_desc": {"type": "boolean", "default": True}
-                    }
-                }
-            ),
-            Tool(
-                name="links_create",
-                description="Create a new link with optional metadata",
-                inputSchema={
-                    "type": "object",
-                    "required": ["url", "title"],
-                    "properties": {
-                        "url": {"type": "string"},
-                        "title": {"type": "string"},
-                        "summary": {"type": "string"},
-                        "notes": {"type": "string"},
-                        "collection_id": {"type": "integer"},
-                        "tag_ids": {"type": "array", "items": {"type": "integer"}},
-                        "is_favorite": {"type": "boolean", "default": False}
-                    }
-                }
-            ),
-            Tool(
-                name="links_update",
-                description="Update an existing link",
-                inputSchema={
-                    "type": "object",
-                    "required": ["link_id"],
-                    "properties": {
-                        "link_id": {"type": "string"},
-                        "title": {"type": "string"},
-                        "summary": {"type": "string"},
-                        "notes": {"type": "string"},
-                        "collection_id": {"type": "integer"},
-                        "tag_ids": {"type": "array", "items": {"type": "integer"}},
-                        "is_favorite": {"type": "boolean"}
-                    }
-                }
-            ),
-            Tool(
-                name="links_delete",
-                description="Delete a link",
-                inputSchema={
-                    "type": "object",
-                    "required": ["link_id"],
-                    "properties": {
-                        "link_id": {"type": "string"}
-                    }
-                }
-            ),
-            Tool(
-                name="links_parse",
-                description="Parse text and extract links with AI analysis",
-                inputSchema={
-                    "type": "object",
-                    "required": ["text"],
-                    "properties": {
-                        "text": {"type": "string"}
-                    }
-                }
-            )
-        ]
+@mcp.tool()
+async def tool_name(param1: str, param2: int = 50) -> str:
+    """Tool description.
     
-    async def handle_tool(self, name: str, arguments: Dict[str, Any], token: str) -> Dict[str, Any]:
-        """Handle link tool calls."""
-        if name == "links_get":
-            return await link_service.get_links(token, **arguments)
-        elif name == "links_create":
-            return await link_service.create_link(token, **arguments)
-        elif name == "links_update":
-            link_id = arguments.pop("link_id")
-            return await link_service.update_link(token, link_id, **arguments)
-        elif name == "links_delete":
-            return await link_service.delete_link(token, arguments["link_id"])
-        elif name == "links_parse":
-            return await link_service.parse_links_from_text(token, arguments["text"])
-        else:
-            raise ValueError(f"Unknown link tool: {name}")
+    Args:
+        param1: Description of parameter 1
+        param2: Description of parameter 2 (default: 50)
+    """
+    # Ensure authentication
+    token = await ensure_authenticated()
+    
+    try:
+        # Call service layer
+        result = await service.method(token, param1, param2)
+        
+        # Format response for user
+        return format_response(result)
+    except Exception as e:
+        logger.error(f"Tool failed: {e}")
+        return f"Error: {str(e)}"
+```
+
+#### 5.3 Response Formatting
+
+All tools return human-readable string responses with emojis and formatting:
+
+```python
+response = f"Found {total} links:\n\n"
+for link in links:
+    response += f"📌 {link['title']}\n"
+    response += f"🔗 {link['url']}\n"
+    response += f"📝 {link['summary'][:100]}...\n"
+    response += "---\n"
 ```
 
 ### 5. Error Handling and Validation
