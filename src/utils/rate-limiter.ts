@@ -17,7 +17,11 @@ export class RateLimiter {
   constructor(maxRequests: number = 100, windowMs: number = 60000) {
     this.maxRequests = maxRequests;
     this.windowMs = windowMs;
-    this.startCleanupInterval();
+    
+    // Only start cleanup interval if not in test environment
+    if (process.env.NODE_ENV !== 'test') {
+      this.startCleanupInterval();
+    }
   }
 
   // Check if request is allowed
@@ -119,6 +123,13 @@ export class RateLimiter {
   // Clear all rate limits
   clear(): void {
     this.requests.clear();
+    
+    // Clear background interval
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    
     logger.info("Rate limiter cleared", { operation: "rate_limiter_clear" });
   }
 

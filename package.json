@@ -1,6 +1,6 @@
 {
   "name": "@msmygit/linklibrary-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server for LinkLibrary.ai bookmark management",
   "main": "dist/server.js",
   "bin": {

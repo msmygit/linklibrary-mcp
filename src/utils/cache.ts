@@ -14,7 +14,11 @@ export class InMemoryCache<T = any> {
     // 5 minutes default
     this.maxSize = maxSize;
     this.defaultTtl = defaultTtl;
-    this.startCleanupInterval();
+    
+    // Only start cleanup interval if not in test environment
+    if (process.env.NODE_ENV !== 'test') {
+      this.startCleanupInterval();
+    }
   }
 
   // Set a value in the cache
@@ -112,6 +116,13 @@ export class InMemoryCache<T = any> {
   clear(): void {
     this.cache.clear();
     this.accessOrder = [];
+    
+    // Clear background interval
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    
     logger.info("Cache cleared", { operation: "cache_clear" });
   }
 

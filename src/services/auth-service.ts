@@ -43,11 +43,18 @@ export class AuthService {
     }
 
     try {
+      // Create form data for OAuth2PasswordRequestForm
+      const formData = new URLSearchParams();
+      formData.append('username', email);
+      formData.append('password', pwd);
+
       const response = await apiClient.post<LinkLibraryAuthResponse>(
         "/auth/login",
+        formData,
         {
-          email,
-          password: pwd,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
         },
       );
 

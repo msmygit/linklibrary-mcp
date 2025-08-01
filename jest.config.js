@@ -16,4 +16,7 @@ module.exports = {
   coverageReporters: ['text', 'lcov', 'html'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
+  testEnvironmentOptions: {
+    NODE_ENV: 'test'
+  }
 }; 

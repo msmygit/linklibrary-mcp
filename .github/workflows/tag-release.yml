@@ -1,0 +1,80 @@
+# @author Madhavan Sridharan
+name: Prepare new tag & changelog PR
+
+# runs on
+# * manually triggered
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Type of version bump'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+# global env vars, available in all jobs and steps
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  new_tag_and_changelog:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Git config
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Bump the tag version
+        id: bump_npm_version
+        run: |
+          npm version ${{ github.event.inputs.release_type }} -m "chore(release): bump tag version to %s"
+
+      # - name: Debug Git state
+      #   run: |
+      #     git remote -v
+      #     git branch
+      #     git config --list
+
+      - name: Extract the new version from package.json
+        id: capture_version
+        run: |
+          VERSION=$(jq -r .version package.json)
+          echo "new_version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        continue-on-error: true
+        run: ./update_changelog.sh
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v7
+        env:
+          GITHUB_TOKEN:
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: "release/bump-tag-version-and-update-changelog"
+          branch-suffix: "short-commit-hash"
+          base: "main"
+          title: "chore(release): Bump tag version and update changelog"
+          commit-message: "chore(release): Bump tag version and update changelog"
+          body: |
+            This pull request bumps the tag version to ${{ steps.capture_version.outputs.new_version }} and updates changelog as part of the release process.
+            Please review and merge.
