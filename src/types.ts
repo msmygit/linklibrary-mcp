@@ -50,6 +50,23 @@ export interface LinkLibrarySearchResult {
   limit: number;
 }
 
+// Paginated response types for collections and tags
+export interface PaginatedTagResponse {
+  items: LinkLibraryTag[];
+  total: number;
+  skip: number;
+  limit: number;
+  has_more: boolean;
+}
+
+export interface PaginatedCollectionResponse {
+  items: LinkLibraryCollection[];
+  total: number;
+  skip: number;
+  limit: number;
+  has_more: boolean;
+}
+
 export interface LinkLibraryUserStats {
   total_links: number;
   total_collections: number;

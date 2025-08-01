@@ -35,6 +35,8 @@ import {
   LinkLibraryTag,
   LinkLibrarySearchResult,
   LinkLibraryUserStats,
+  PaginatedTagResponse,
+  PaginatedCollectionResponse,
   GetLinksParams,
   CreateLinkParams,
   GetCollectionsParams,
@@ -87,6 +89,9 @@ function formatLinks(links: LinkLibraryLink[]): string {
 
 // Helper function to format collections for display
 function formatCollections(collections: LinkLibraryCollection[]): string {
+  if (!collections || !Array.isArray(collections)) {
+    return 'No collections found or invalid response format.';
+  }
   if (collections.length === 0) {
     return 'No collections found.';
   }
@@ -108,6 +113,9 @@ function formatCollections(collections: LinkLibraryCollection[]): string {
 
 // Helper function to format tags for display
 function formatTags(tags: LinkLibraryTag[]): string {
+  if (!tags || !Array.isArray(tags)) {
+    return 'No tags found or invalid response format.';
+  }
   if (tags.length === 0) {
     return 'No tags found.';
   }
@@ -321,7 +329,7 @@ const tools: Tool[] = [
   },
   {
     name: 'get_user_stats',
-    description: 'Get user statistics and insights',
+    description: 'Get user statistics and insights (currently not available)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -367,18 +375,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await ensureAuthenticated();
         const params = args as GetLinksParams;
         
-        const queryParams = new URLSearchParams();
-        if (params.limit) queryParams.append('limit', params.limit.toString());
-        if (params.skip) queryParams.append('skip', params.skip.toString());
-        if (params.collection_id) queryParams.append('collection_id', params.collection_id.toString());
-        if (params.tag_ids) queryParams.append('tag_ids', params.tag_ids.join(','));
-        if (params.search) queryParams.append('search', params.search);
-        if (params.is_favorite !== undefined) queryParams.append('is_favorite', params.is_favorite.toString());
-        if (params.sort_by) queryParams.append('sort_by', params.sort_by);
-        if (params.sort_desc !== undefined) queryParams.append('sort_desc', params.sort_desc.toString());
+        try {
+          const queryParams = new URLSearchParams();
+          if (params.limit) queryParams.append('limit', params.limit.toString());
+          if (params.skip) queryParams.append('skip', params.skip.toString());
+          if (params.collection_id) queryParams.append('collection_id', params.collection_id.toString());
+          if (params.tag_ids) queryParams.append('tag_ids', params.tag_ids.join(','));
+          if (params.search) queryParams.append('search', params.search);
+          if (params.is_favorite !== undefined) queryParams.append('is_favorite', params.is_favorite.toString());
+          if (params.sort_by) queryParams.append('sort_by', params.sort_by);
+          if (params.sort_desc !== undefined) queryParams.append('sort_desc', params.sort_desc.toString());
 
-        const data = await apiClient.get<LinkLibrarySearchResult>(`/links?${queryParams.toString()}`);
-        result = formatLinks(data.items);
+          const data = await apiClient.get<LinkLibrarySearchResult>(`/links?${queryParams.toString()}`);
+          
+          if (!data.items || !Array.isArray(data.items)) {
+            throw new Error(`Invalid links response format: ${JSON.stringify(data)}`);
+          }
+          
+          result = formatLinks(data.items);
+        } catch (error) {
+          throw new Error(`Failed to get links: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
         break;
       }
 
@@ -398,8 +415,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await ensureAuthenticated();
         const params = args as GetCollectionsParams;
         
-        const collections = await apiClient.get<LinkLibraryCollection[]>('/collections');
-        result = formatCollections(collections);
+        // Use the main collections endpoint which returns paginated response
+        const response = await apiClient.get<PaginatedCollectionResponse>('/collections');
+        if (!response.items || !Array.isArray(response.items)) {
+          throw new Error(`Invalid response format: ${JSON.stringify(response)}`);
+        }
+        result = formatCollections(response.items);
         break;
       }
 
@@ -407,8 +428,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await ensureAuthenticated();
         const params = args as GetTagsParams;
         
-        const tags = await apiClient.get<LinkLibraryTag[]>('/tags');
-        result = formatTags(tags);
+        // Use the main tags endpoint which returns paginated response
+        const response = await apiClient.get<PaginatedTagResponse>('/tags');
+        if (!response.items || !Array.isArray(response.items)) {
+          throw new Error(`Invalid response format: ${JSON.stringify(response)}`);
+        }
+        result = formatTags(response.items);
         break;
       }
 
@@ -416,24 +441,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await ensureAuthenticated();
         const params = args as unknown as SearchAdvancedParams;
         
-        const data = await apiClient.post<LinkLibrarySearchResult>('/search/advanced', params);
-        
-        if (data.items.length === 0) {
-          result = `No results found for query: '${params.query}'`;
-        } else {
-          result = `Found ${data.total} results for '${params.query}':\n\n`;
-          result += formatLinks(data.items);
+        try {
+          const data = await apiClient.post<LinkLibrarySearchResult>('/search/link', params);
+          
+          if (!data.items || !Array.isArray(data.items)) {
+            throw new Error(`Invalid search response format: ${JSON.stringify(data)}`);
+          }
+          
+          if (data.items.length === 0) {
+            result = `No results found for query: '${params.query}'`;
+          } else {
+            result = `Found ${data.total} results for '${params.query}':\n\n`;
+            result += formatLinks(data.items);
+          }
+        } catch (error) {
+          throw new Error(`Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
         break;
       }
 
       case 'get_user_stats': {
         await ensureAuthenticated();
-        const params = args as GetUserStatsParams;
-        const period = params.period || 'month';
-        
-        const stats = await apiClient.get<LinkLibraryUserStats>(`/analytics/user-stats?period=${period}`);
-        result = formatUserStats(stats, period);
+        result = '⚠️ User stats functionality is not available in the current API version.';
         break;
       }
 
