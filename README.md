@@ -1,4 +1,10 @@
 # @msmygit/linklibrary-mcp
+![NPM Downloads](https://img.shields.io/npm/d18m/%40msmygit%2Flinklibrary-mcp?style=plastic&logoColor=green&color=green&link=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2F%40msmygit%2Flinklibrary-mcp)
+![GitHub contributors](https://img.shields.io/github/contributors/msmygit/linklibrary-mcp)
+![Static Badge](https://img.shields.io/badge/Contributors-Welcome-green?style=plastic&logoColor=green)
+![NPM Last Update](https://img.shields.io/npm/last-update/%40msmygit%2Flinklibrary-mcp)
+![NPM License](https://img.shields.io/npm/l/%40msmygit%2Flinklibrary-mcp)
+![NPM Version](https://img.shields.io/npm/v/%40msmygit%2Flinklibrary-mcp)
 
 A high-performance, production-ready Model Context Protocol (MCP) server that provides AI assistants with programmatic access to [LinkLibrary.ai](https://linklibrary.ai) bookmark management capabilities.
 
