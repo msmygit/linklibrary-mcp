@@ -79,7 +79,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS/Li
   "mcpServers": {
     "linklibrary-mcp": {
       "command": "npx",
-      "args": ["-y", "@msmygit/linklibrary-mcp"],
+      "args": ["-y", "@msmygit/linklibrary-mcp@latest"],
       "env": {
         "LL_USERNAME": "your_email@example.com",
         "LL_PASSWORD": "your_password",
@@ -99,7 +99,7 @@ Add to your VSCode settings:
   "mcp.servers": {
     "linklibrary-mcp": {
       "command": "npx",
-      "args": ["-y", "@msmygit/linklibrary-mcp"],
+      "args": ["-y", "@msmygit/linklibrary-mcp@latest"],
       "env": {
         "LL_USERNAME": "your_email@example.com",
         "LL_PASSWORD": "your_password"
