@@ -6,7 +6,7 @@ dotenv.config();
 
 // Default configuration
 const DEFAULT_CONFIG: ServerConfig = {
-  api_base_url: 'https://linklibrary.ai/api',
+  api_base_url: 'https://api.linklibrary.ai/api/v1',
   timeout_ms: 30000,
   max_retries: 3,
   cache_ttl_seconds: 300, // 5 minutes

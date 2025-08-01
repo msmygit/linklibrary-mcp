@@ -31,7 +31,7 @@ The package is published on npm and can be used directly with MCP clients:
   "mcpServers": {
     "linklibrary-mcp": {
       "command": "npx",
-      "args": ["-y", "@msmygit/linklibrary-mcp"],
+      "args": ["-y", "@msmygit/linklibrary-mcp@latest"],
       "env": {
         "LL_USERNAME": "your_email@example.com",
         "LL_PASSWORD": "your_password"
@@ -56,7 +56,7 @@ npm install @msmygit/linklibrary-mcp
 | `LL_USERNAME` | LinkLibrary.ai email address | - | Yes* |
 | `LL_PASSWORD` | LinkLibrary.ai password | - | Yes* |
 | `LL_TOKEN` | LinkLibrary.ai API token | - | Yes* |
-| `LINKLIBRARY_API_URL` | API base URL | `https://linklibrary.ai/api` | No |
+| `LINKLIBRARY_API_URL` | API base URL | `https://api.linklibrary.ai/api/v1` | No |
 | `API_TIMEOUT_MS` | API request timeout | `30000` | No |
 | `API_MAX_RETRIES` | Maximum retry attempts | `3` | No |
 | `CACHE_TTL_SECONDS` | Cache TTL in seconds | `300` | No |
