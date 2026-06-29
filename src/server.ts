@@ -403,7 +403,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await ensureAuthenticated();
         const params = args as unknown as CreateLinkParams;
         
-        const data = await apiClient.post<LinkLibraryLink>('/links', params);
+        // POST /links returns the created link wrapped in a single-element array;
+        // tolerate a bare object too in case the backend contract changes.
+        const created = await apiClient.post<LinkLibraryLink | LinkLibraryLink[]>('/links', params);
+        const data = Array.isArray(created) ? created[0] : created;
         result = `✅ Bookmark created successfully!\n\n📌 ${data.title}\n🔗 ${data.url}\n📝 ${data.summary || 'No summary'}`;
         
         // Invalidate cache for links
